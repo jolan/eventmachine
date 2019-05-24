@@ -67,7 +67,7 @@ class TestInactivityTimeout < Test::Unit::TestCase
 
         define_method :ssl_handshake_completed do
           @timer = EM::PeriodicTimer.new(0.05) do
-            #puts "get_idle_time: #{get_idle_time} inactivity: #{comm_inactivity_timeout}"
+            puts "get_idle_time: #{get_idle_time} inactivity: #{comm_inactivity_timeout}"
           end
           send_data "hello world"
         end
