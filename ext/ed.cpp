@@ -1584,6 +1584,18 @@ ConnectionDescriptor::Heartbeat
 
 void ConnectionDescriptor::Heartbeat()
 {
+	/* Heartbeats can be delivered a few hundred/thousand microseconds
+	 * before the timeout would be hit.  For example, with a timeout of
+	 * 15 seconds (15000000 microseconds) a heartbeat may be delivered
+	 * when the delta between the current loop time and last activity is
+	 * 14998819 microseconds.   Add a small amount of skew derived
+	 * from the current timer-quantum value to compensate.  Without this
+	 * adjustment we won't timeout until the next heartbeat interval which
+	 * would be double the requested timeout (30 seconds).  The frequency
+	 * of this condition seems to increase when using TLS.
+	 */
+	uint64_t skew = MyEventMachine->GetTimerQuantum();
+
 	/* Only allow a certain amount of time to go by while waiting
 	 * for a pending connect. If it expires, then kill the socket.
 	 * For a connected socket, close it if its inactivity timer
@@ -1591,14 +1603,14 @@ void ConnectionDescriptor::Heartbeat()
 	 */
 
 	if (bConnectPending) {
-		if ((MyEventMachine->GetCurrentLoopTime() - CreatedAt) >= PendingConnectTimeout) {
+		if ((skew + MyEventMachine->GetCurrentLoopTime() - CreatedAt) >= PendingConnectTimeout) {
 			UnbindReasonCode = ETIMEDOUT;
 			ScheduleClose (false);
 			//bCloseNow = true;
 		}
 	}
 	else {
-		if (InactivityTimeout && ((MyEventMachine->GetCurrentLoopTime() - LastActivity) >= InactivityTimeout)) {
+		if (InactivityTimeout && ((skew + MyEventMachine->GetCurrentLoopTime() - LastActivity) >= InactivityTimeout)) {
 			UnbindReasonCode = ETIMEDOUT;
 			ScheduleClose (false);
 			//bCloseNow = true;
